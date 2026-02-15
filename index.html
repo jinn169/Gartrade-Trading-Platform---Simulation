@@ -1045,6 +1045,28 @@
             50% { opacity: 0.5; }
         }
 
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
         .loading {
             animation: pulse 1.5s ease-in-out infinite;
         }
@@ -1563,8 +1585,116 @@
 
         let notifications = [];
         let myOffers = []; 
+        let allUsersData = []; // Store all user accounts
         const botUsers = ["BotA", "BotB", "BotC", "BotD"];
         const offers = ["$50 cash offer", "My PUBG account for this", "I'll trade 10,000 in-game gold", "Trade plus $5", "My CS:GO knife skin"];
+        
+        // Load all saved users
+        function loadAllUsers() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('gartradeAllUsers'));
+                if (Array.isArray(saved) && saved.length > 0) {
+                    allUsersData = saved;
+                } else {
+                    allUsersData = [];
+                }
+            } catch (e) {
+                console.error('Error loading users', e);
+                allUsersData = [];
+            }
+        }
+        
+        // Save all users
+        function saveAllUsers() {
+            try {
+                localStorage.setItem('gartradeAllUsers', JSON.stringify(allUsersData));
+            } catch (e) {
+                console.error('Save all users failed', e);
+            }
+        }
+        
+        // Save notifications
+        function saveNotifications() {
+            try {
+                localStorage.setItem('gartradeNotifications', JSON.stringify(notifications));
+            } catch (e) {
+                console.error('Save notifications failed', e);
+            }
+        }
+        
+        // Load notifications
+        function loadNotifications() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('gartradeNotifications'));
+                if (Array.isArray(saved) && saved.length > 0) {
+                    notifications = saved;
+                } else {
+                    notifications = [];
+                }
+            } catch (e) {
+                console.error('Error loading notifications', e);
+                notifications = [];
+            }
+        }
+        
+        // Save offers
+        function saveMyOffers() {
+            try {
+                localStorage.setItem('gartradeMyOffers', JSON.stringify(myOffers));
+            } catch (e) {
+                console.error('Save offers failed', e);
+            }
+        }
+        
+        // Load offers
+        function loadMyOffers() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('gartradeMyOffers'));
+                if (Array.isArray(saved) && saved.length > 0) {
+                    myOffers = saved;
+                } else {
+                    myOffers = [];
+                }
+            } catch (e) {
+                console.error('Error loading offers', e);
+                myOffers = [];
+            }
+        }
+
+        // Show notification toast for real-time offers
+        function showNotificationToast(message) {
+            const toastContainer = document.getElementById('notificationToastContainer');
+            if (!toastContainer) {
+                // Create container if it doesn't exist
+                const container = document.createElement('div');
+                container.id = 'notificationToastContainer';
+                container.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 99999; display: flex; flex-direction: column; gap: 10px;';
+                document.body.appendChild(container);
+            }
+            
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+                color: white;
+                padding: 16px 20px;
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(0, 217, 255, 0.4);
+                font-weight: 600;
+                animation: slideIn 0.3s ease-out;
+                max-width: 300px;
+                word-wrap: break-word;
+            `;
+            toast.textContent = message;
+            toast.innerHTML = '🔔 ' + message;
+            
+            document.getElementById('notificationToastContainer').appendChild(toast);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
 
 
         function findTrade(id) {
@@ -1678,8 +1808,23 @@
                 msg.textContent = 'Please fill in all fields.';
                 return;
             }
+            
+            if (password.length < 8) {
+                msg.style.color = 'var(--danger-color)';
+                msg.textContent = 'Password must be at least 8 characters long.';
+                return;
+            }
+            
+            // Check if email already exists
+            loadAllUsers();
+            if (allUsersData.some(u => u.email === email)) {
+                msg.style.color = 'var(--danger-color)';
+                msg.textContent = 'Email already registered.';
+                return;
+            }
 
             const user = { 
+                id: Date.now(),
                 name,
                 username: username || name,
                 email, 
@@ -1689,6 +1834,8 @@
                 verified: false
             };
 
+            allUsersData.push(user);
+            saveAllUsers();
             localStorage.setItem('gartradeUser', JSON.stringify(user));
 
             msg.style.color = 'var(--success-color)';
@@ -1701,54 +1848,45 @@
             const password = document.getElementById('loginPassword').value;
             const msg = document.getElementById('loginMsg');
             msg.textContent = ''; 
+            
+            loadAllUsers();
 
-            const storedUser = JSON.parse(localStorage.getItem('gartradeUser'));
+            const storedUser = allUsersData.find(u => 
+                (identifier === u.email || identifier === u.name || identifier === u.username) && 
+                password === u.password
+            );
 
             if (!storedUser) {
-                msg.style.color = 'var(--danger-color)';
-                msg.textContent = 'No account found. Please sign up first.';
-                loginAttempts++;
-                checkLoginAttempts(msg);
-                return;
-            }
-
-            const matchesIdentifier = identifier === storedUser.email || identifier === storedUser.name || (storedUser.username && identifier === storedUser.username);
-
-            if (matchesIdentifier && password === storedUser.password) {
-                msg.style.color = 'var(--success-color)';
-                msg.textContent = 'Login successful! Welcome to GarTrade.';
-                loginAttempts = 0; 
-
-                const oldUser = currentUser; 
-                currentUser = storedUser.username || storedUser.name;
-                loggedUserEmail = storedUser.email;
-                isVerified = storedUser.verified || false;
-                defaultProfilePhotoUrl = storedUser.photoUrl || defaultProfilePhotoUrl; 
-
-                if (oldUser === "User1" && currentUser !== "User1") {
-                    trades.forEach(trade => {
-                        if (trade.owner === "User1") {
-                            trade.owner = currentUser;
-                        }
-                    });
-                    saveTrades();
-                }
-                updateUI();
-            
-                notifications = [];
-                initializeBotOffers();
-                
-                document.getElementById('loginContainer').style.display = 'none';
-                document.getElementById('appContainer').classList.remove('hidden');
-                
-                renderNotifications(true);
-
-            } else {
                 msg.style.color = 'var(--danger-color)';
                 msg.textContent = 'Invalid email or password.';
                 loginAttempts++;
                 checkLoginAttempts(msg);
+                return;
             }
+            
+            msg.style.color = 'var(--success-color)';
+            msg.textContent = 'Login successful! Welcome to GarTrade.';
+            loginAttempts = 0; 
+
+            const oldUser = currentUser; 
+            currentUser = storedUser.username || storedUser.name;
+            loggedUserEmail = storedUser.email;
+            isVerified = storedUser.verified || false;
+            defaultProfilePhotoUrl = storedUser.photoUrl || defaultProfilePhotoUrl; 
+
+            localStorage.setItem('gartradeUser', JSON.stringify(storedUser));
+            localStorage.setItem('gartradeCurrentUserId', storedUser.id);
+            
+            loadMyOffers();
+            loadNotifications();
+            updateUI();
+        
+            initializeBotOffers();
+            
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('appContainer').classList.remove('hidden');
+            
+            renderNotifications(true);
         }
 
         function checkLoginAttempts(msg) {
@@ -1815,7 +1953,10 @@
 
         function handleLogout() {
             if (confirm('Are you sure you want to logout?')) {
+                saveNotifications();
+                saveMyOffers();
                 localStorage.removeItem('gartradeUser');
+                localStorage.removeItem('gartradeCurrentUserId');
                 currentUser = "Guest"; 
                 loggedUserEmail = ""; 
                 isVerified = false;
@@ -1844,18 +1985,86 @@
             }
 
             const file = fileInput.files[0];
+            
+            // Validate file is an image
+            if (!file.type.startsWith('image/')) {
+                alert('❌ Invalid file type. Please upload an image file (JPG, PNG, etc.).');
+                return;
+            }
+            
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('❌ File too large. Maximum size is 5MB.');
+                return;
+            }
+            
             const reader = new FileReader();
             reader.onload = function(e) {
                 const idDataUrl = e.target.result;
-                isVerified = true;
-                const storedUser = JSON.parse(localStorage.getItem('gartradeUser')) || {};
-                storedUser.verified = true;
-                storedUser.idDocument = idDataUrl; // store ID data (simulated, local only)
-                localStorage.setItem('gartradeUser', JSON.stringify(storedUser));
+                
+                // Create temporary image to analyze
+                const img = new Image();
+                img.onload = function() {
+                    // Basic validation: Check if image dimensions suggest it could be an ID
+                    // ID documents are typically wider than they are tall (landscape)
+                    const width = img.width;
+                    const height = img.height;
+                    const aspectRatio = width / height;
+                    
+                    // ID cards are typically 16:10 or similar (wider than tall)
+                    // Reject if too square (like a portrait photo) or wrong orientation
+                    if (aspectRatio < 1.2) {
+                        alert('❌ Invalid ID document. Please upload a clear photo of your government-issued ID (Driver License, Passport, National ID, etc.).\\n\\nNote: ID documents are typically landscape orientation.');                       
+                        return;
+                    }
+                    
+                    // Simulate OCR/document detection - check for common ID text patterns
+                    // In a real scenario, this would use ML or actual document verification
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // Check if image has sufficient contrast (most ID documents have clear text)
+                    const imageData = ctx.getImageData(0, 0, 100, 100);
+                    const data = imageData.data;
+                    let brightness = 0;
+                    for (let i = 0; i < data.length; i += 4) {
+                        brightness += (data[i] + data[i+1] + data[i+2]) / 3;
+                    }
+                    brightness /= (data.length / 4);
+                    
+                    // If image is too uniform (like a solid color), reject it
+                    if (brightness < 30 || brightness > 225) {
+                        alert('❌ Image quality issue detected. Please upload a clear, well-lit photo of your ID.');                       
+                        return;
+                    }
+                    
+                    // If all checks pass, proceed with verification
+                    isVerified = true;
+                    const storedUser = JSON.parse(localStorage.getItem('gartradeUser')) || {};
+                    storedUser.verified = true;
+                    storedUser.idDocument = idDataUrl;
+                    localStorage.setItem('gartradeUser', JSON.stringify(storedUser));
+                    
+                    // Update in allUsersData
+                    loadAllUsers();
+                    const userIndex = allUsersData.findIndex(u => u.email === storedUser.email);
+                    if (userIndex !== -1) {
+                        allUsersData[userIndex].verified = true;
+                        allUsersData[userIndex].idDocument = idDataUrl;
+                        saveAllUsers();
+                    }
 
-                alert('✅ Account verified successfully with uploaded ID!');
-                closeModal('verificationModal');
-                updateVerificationBadge();
+                    alert('✅ Account verified successfully with uploaded ID!');
+                    closeModal('verificationModal');
+                    updateVerificationBadge();
+                };
+                img.onerror = function() {
+                    alert('❌ Failed to process image. Please try with a different file.');
+                };
+                img.src = idDataUrl;
             };
             reader.readAsDataURL(file);
         }
@@ -2080,6 +2289,7 @@
                 myOffers.splice(offerIndex, 1);
             }
             
+            saveMyOffers();
             renderMyOffers();
         }
 
@@ -2093,6 +2303,14 @@
             countElement.textContent = userNotifications.length;
             badgeElement.style.display = userNotifications.length > 0 ? 'block' : 'none';
             badgeElement.textContent = userNotifications.length > 9 ? '9+' : userNotifications.length;
+            
+            // Show toast notification for new offers
+            if (forceUpdate && userNotifications.length > 0) {
+                const recentNotification = userNotifications[0];
+                const trade = findTrade(recentNotification.tradeId);
+                const tradeTitle = trade ? trade.title : 'an item';
+                showNotificationToast(`${recentNotification.fromUser} wants to trade for ${tradeTitle}!`);
+            }
 
             if (userNotifications.length === 0) {
                 content.innerHTML = '<div style="text-align: center; padding: 15px; color: var(--text-muted);">No new notifications.</div>';
@@ -2112,11 +2330,6 @@
                 itemDiv.innerHTML = `
                     <p style="margin: 0;"><strong>${notification.fromUser}</strong> sent a ${notification.status === 'bid' ? 'bid' : 'trade request'} for <strong>${trade.title}</strong>.</p>
                     <p style="margin: 5px 0 0; font-style: italic; color: var(--text-muted);">Offer: ${notification.offer}</p>
-                    <div class="notification-actions">
-                        <button class="btn btn-success" onclick="handleNotificationAction(${notification.id}, 'accept');">Accept</button>
-                        <button class="btn btn-delete" onclick="handleNotificationAction(${notification.id}, 'reject');">Reject</button>
-                        <button class="btn btn-secondary" onclick="startMessage('${notification.fromUser}', 'Re: ${trade.title}', ${notification.id});">Reply</button>
-                    </div>
                 `;
                 content.appendChild(itemDiv);
             });
@@ -2188,6 +2401,7 @@
             } else if (action === 'reject') {
                 alert(`Trade Rejected: You declined the offer from ${notification.fromUser}.`);
                 notifications.splice(notificationIndex, 1);
+                saveNotifications();
                 renderNotifications(true);
             }
         }
@@ -2235,15 +2449,33 @@
             if (!targetNotification && pendingTradeNotification && pendingTradeNotification.id === notificationId) {
                 targetNotification = pendingTradeNotification; 
                 if (targetNotification.owner !== currentUser) {
-                    notifications.unshift(targetNotification); 
+                    notifications.unshift(targetNotification);
+                    saveNotifications();
                 }
                 pendingTradeNotification = null; 
             }
+            
+            // Also check in myOffers if still not found
+            if (!targetNotification) {
+                const offerInMyOffers = myOffers.find(o => o.id === notificationId);
+                if (offerInMyOffers) {
+                    targetNotification = offerInMyOffers;
+                }
+            }
 
             if (!targetNotification) {
-                alert("Error: Transaction data not found.");
+                alert("Error: Transaction is not stored");
                 return;
             }
+            
+            // Store transaction data
+            const transactionData = {
+                transactionId: notificationId,
+                timestamp: new Date().toISOString(),
+                status: 'authorized',
+                notification: targetNotification
+            };
+            localStorage.setItem('gartradeTransaction_' + notificationId, JSON.stringify(transactionData));
 
             const trade = findTrade(targetNotification.tradeId);
             if (trade) {
@@ -2259,18 +2491,32 @@
 
         function finalizeTrade(notificationId) {
             const notificationIndex = notifications.findIndex(n => n.id === notificationId);
-            if (notificationIndex === -1) {
+            let notification = null;
+            
+            if (notificationIndex !== -1) {
+                notification = notifications[notificationIndex];
+            } else {
+                // Check in myOffers as backup
+                const offerIndex = myOffers.findIndex(o => o.id === notificationId);
+                if (offerIndex !== -1) {
+                    notification = myOffers[offerIndex];
+                }
+            }
+            
+            if (!notification) {
                 alert("Error: Trade notification not found.");
                 closeModal('verificationTradeModal');
                 return;
             }
 
-            const notification = notifications[notificationIndex];
             const trade = findTrade(notification.tradeId);
 
             if (!trade || trade.sold) {
                 alert("Error: Listing not found or already sold.");
-                notifications.splice(notificationIndex, 1);
+                if (notificationIndex !== -1) {
+                    notifications.splice(notificationIndex, 1);
+                }
+                saveNotifications();
                 renderNotifications(true);
                 closeModal('verificationTradeModal');
                 return;
@@ -2291,10 +2537,28 @@
 
             saveTrades();
             saveTradeHistory();
+            
+            // Store transaction completion
+            const transactionData = {
+                transactionId: notificationId,
+                timestamp: new Date().toISOString(),
+                status: 'completed',
+                seller: trade.owner,
+                buyer: notification.fromUser,
+                tradeId: trade.id,
+                tradeTitle: trade.title,
+                value: trade.tradeValue
+            };
+            localStorage.setItem('gartradeTransaction_' + notificationId, JSON.stringify(transactionData));
 
             alert(`✅ SUCCESS: Trade Completed! "${trade.title}" has been transferred to ${notification.fromUser}.`);
-            notifications.splice(notificationIndex, 1);
+            
+            if (notificationIndex !== -1) {
+                notifications.splice(notificationIndex, 1);
+            }
+            
             pendingTradeNotification = null;
+            saveNotifications();
             closeModal('verificationTradeModal');
             
             renderTrades();
@@ -2328,20 +2592,36 @@
             };
 
             myOffers.unshift(newOffer);
+            saveMyOffers();
+            
+            // Also create a notification so the user sees it in notifications dropdown
+            const notification = {
+                id: newId,
+                owner: currentUser,
+                fromUser: botUser,
+                tradeId: targetTrade.id,
+                offer: offerText,
+                status: 'trade'
+            };
+            notifications.unshift(notification);
+            saveNotifications();
+            
             renderMyOffers();
+            renderNotifications(true);
         }
 
         function startLiveBotLoop() {
+            // Bot offers every 8-10 seconds (increased frequency for demo purposes)
             setInterval(() => {
                 if (currentUser === "Guest" || !isVerified) return; 
 
                 const userActiveTrades = trades.filter(t => t.owner === currentUser && !t.sold);
                 
-                if (userActiveTrades.length > 0 && Math.random() > 0.7) {
+                if (userActiveTrades.length > 0 && Math.random() > 0.6) {
                     const targetTrade = userActiveTrades[Math.floor(Math.random() * userActiveTrades.length)];
                     generateRandomBotOffer(targetTrade);
                 }
-            }, 15000); 
+            }, 8000); 
         }
 
         function generateBotResponse(messageBody, user, subject) {
@@ -2349,28 +2629,59 @@
             const subjectMatch = subject.match(/Trade Offer for (.+)/i);
             const item = subjectMatch ? subjectMatch[1] : 'your listed item';
             
+            // Greeting responses
             if (normalizedMessage.includes('hi') || normalizedMessage.includes('hello') || normalizedMessage.includes('hey')) {
                 const greetings = [
-                    `Hello! Thanks for reaching out about ${item}. How can I assist you?`,
-                    `Hi there! Interested in ${item}? Let's discuss!`,
-                    `Hey! Let's talk about the trade for ${item}.`,
+                    `Hey! Yeah, I'm definitely interested in the ${item}. What's the best you can do on this?`,
+                    `Hi there! So I saw your ${item} listing and it looks pretty good. Can we work something out?`,
+                    `Hello! I've been looking for something like ${item}. Are you open to negotiations?`,
+                    `What's up! Your ${item} caught my eye. Let me know your thoughts! 😊`,
                 ];
                 return greetings[Math.floor(Math.random() * greetings.length)];
             }
 
-            if (normalizedMessage.includes('offer') || normalizedMessage.includes('value') || normalizedMessage.includes('price')) {
-                const offers = [
-                    `What's your best offer for ${item}?`,
-                    `I'm looking for a fair trade. What do you propose?`,
-                    `Please submit your official offer through the trade request system.`,
+            // Questions about value/price
+            if (normalizedMessage.includes('offer') || normalizedMessage.includes('value') || normalizedMessage.includes('price') || normalizedMessage.includes('cost') || normalizedMessage.includes('much')) {
+                const priceQuestions = [
+                    `I'm thinking somewhere around the range you mentioned, but I might be able to add a little more. What do you say?`,
+                    `The price seems fair, honestly. I was just wondering if there's any room for negotiation? 🤔`,
+                    `That's actually a solid deal. I'm ready to move forward whenever you are!`,
+                    `Yeah, the value checks out for me. When can we complete this trade?`,
+                    `I've seen similar listings going for that price. I'm definitely interested!`,
                 ];
-                return offers[Math.floor(Math.random() * offers.length)];
+                return priceQuestions[Math.floor(Math.random() * priceQuestions.length)];
             }
             
+            // Questions about condition/details
+            if (normalizedMessage.includes('condition') || normalizedMessage.includes('detail') || normalizedMessage.includes('photo') || normalizedMessage.includes('picture')) {
+                const detailQuestions = [
+                    `The photos look great, by the way. Really gives a good idea of what I'm getting.`,
+                    `Thanks for those details! Everything checks out perfectly for me.`,
+                    `I appreciate you being thorough with the information. Looks like exactly what I need!`,
+                    `The condition looks immaculate from the pics. When can we complete the trade?`,
+                ];
+                return detailQuestions[Math.floor(Math.random() * detailQuestions.length)];
+            }
+            
+            // Ready to trade
+            if (normalizedMessage.includes('ready') || normalizedMessage.includes('proceed') || normalizedMessage.includes('deal') || normalizedMessage.includes('accept')) {
+                const readyResponses = [
+                    `Awesome! I'm pumped about this. Let's get it finalized asap! 🎉`,
+                    `Perfect! I'm ready whenever. Let's lock this in!`,
+                    `Agreed! This is going to be a great trade. What's next?`,
+                    `Excellent! I'm good to go. Let's make it happen! ✅`,
+                ];
+                return readyResponses[Math.floor(Math.random() * readyResponses.length)];
+            }
+            
+            // Default friendly responses
             const fallbacks = [
-                `Thanks for your message! Let's finalize this trade for ${item}.`,
-                `Noted! Submit your official offer on the listing page.`,
-                `Great! Looking forward to completing this trade.`,
+                `Thanks for getting back to me! This trade is looking really good. 😊`,
+                `I'm really interested in this. Let me know what works best for you!`,
+                `Sounds good to me! I'm confident about this transaction.`,
+                `Cool, cool. I think we're on the same page here. Let's move forward!`,
+                `Great feedback! Looking forward to working this out with you.`,
+                `Yeah, I'm feeling good about this trade. When can we make it official?`,
             ];
             return fallbacks[Math.floor(Math.random() * fallbacks.length)];
         }
@@ -2589,6 +2900,20 @@
             };
 
             myOffers.unshift(newOffer);
+            saveMyOffers();
+            
+            // Also create a notification for the trade owner
+            const tradeOwnerNotification = {
+                id: newId,
+                owner: trade.owner,
+                fromUser: currentUser,
+                tradeId: trade.id,
+                offer: offer,
+                status: 'trade'
+            };
+            
+            notifications.unshift(tradeOwnerNotification);
+            saveNotifications();
             
             alert(`✅ Trade request submitted! Awaiting response from ${trade.owner}.`);
             
@@ -2677,6 +3002,17 @@
                 storedUser.notifications = notificationsPref;
                 storedUser.photoUrl = defaultProfilePhotoUrl; 
                 localStorage.setItem('gartradeUser', JSON.stringify(storedUser));
+                
+                // Update in allUsersData
+                loadAllUsers();
+                const userIndex = allUsersData.findIndex(u => u.id === storedUser.id);
+                if (userIndex !== -1) {
+                    allUsersData[userIndex].email = newEmail;
+                    allUsersData[userIndex].notifications = notificationsPref;
+                    allUsersData[userIndex].photoUrl = defaultProfilePhotoUrl;
+                    saveAllUsers();
+                }
+                
                 loggedUserEmail = newEmail;
                 alert('✅ Settings saved successfully!');
             } else {
@@ -2700,9 +3036,9 @@
                 return;
             }
             
-            if (newPass.length < 6) {
+            if (newPass.length < 8) {
                 msg.style.color = 'var(--danger-color)';
-                msg.textContent = 'New password must be at least 6 characters.';
+                msg.textContent = 'New password must be at least 8 characters.';
                 return;
             }
 
@@ -2720,6 +3056,14 @@
 
             storedUser.password = newPass;
             localStorage.setItem('gartradeUser', JSON.stringify(storedUser));
+            
+            // Update in allUsersData
+            loadAllUsers();
+            const userIndex = allUsersData.findIndex(u => u.id === storedUser.id);
+            if (userIndex !== -1) {
+                allUsersData[userIndex].password = newPass;
+                saveAllUsers();
+            }
             
             msg.style.color = 'var(--success-color)';
             msg.textContent = '✅ Password changed! Logging out...';
@@ -2801,6 +3145,11 @@
             const loginContainer = document.getElementById('loginContainer');
             const appContainer = document.getElementById('appContainer');
 
+            // Load all user data and current session
+            loadAllUsers();
+            loadMyOffers();
+            loadNotifications();
+            
             const storedUser = JSON.parse(localStorage.getItem('gartradeUser'));
             if (storedUser) {
                 currentUser = storedUser.username || storedUser.name;
