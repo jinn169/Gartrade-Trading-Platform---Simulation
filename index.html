@@ -1110,7 +1110,7 @@
                 <div id="signupBox" class="hidden">
                     <h2>Sign Up</h2>
                     <input type="text" id="signupName" placeholder="Full Name" />
-                    <input type="text" id="signupUsername" placeholder="Username (optional)" />
+                    <input type="text" id="signupUsername" placeholder="Username" />
                     <input type="email" id="signupEmail" placeholder="Email" />
                     <input type="password" id="signupPassword" placeholder="Password" />
                     <button onclick="signup()">Create Account</button>
@@ -1190,7 +1190,7 @@
                         </div>
                         <a href="#" onclick="openModal('verificationModal'); toggleDropdown('profileDropdown'); return false;">✓ Verify Account</a>
                         <a href="#" onclick="openModal('settingsModal'); toggleDropdown('profileDropdown'); return false;">⚙ Settings</a>
-                        <a href="#" onclick="handleLogout(); toggleDropdown('profileDropdown'); return false;">🚪 Logout</a>
+                        <a href="#" onclick="handleLogout(); toggleDropdown('profileDropdown'); return false;">»» Logout</a>
                     </div>
                 </div>
             </div>
@@ -1233,7 +1233,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="verificationCode">(Optional) Enter Verification Code</label>
+                    <label for="verificationCode">Enter Verification Code</label>
                     <input type="text" id="verificationCode" placeholder="Enter 6-digit code sent to your email (optional)">
                     <p style="font-size: 12px; color: var(--text-muted); margin-top: 5px;">Simulated code: <strong style="color: var(--primary-color);">123456</strong></p>
                 </div>
